@@ -1,0 +1,49 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Documents uploaded by users
+    match /documents/{docId} {
+      allow create: if request.auth != null &&
+        request.resource.data.userEmail is string &&
+        request.resource.data.downloadURL is string;
+
+      // Only admins can list or read all documents
+      allow list, read: if request.auth != null &&
+        exists(/databases/$(database)/documents/artifacts/$(request.resource.data.projectId)/users/$(request.auth.uid)/profile/data) &&
+        get(/databases/$(database)/documents/artifacts/$(request.resource.data.projectId)/users/$(request.auth.uid)/profile/data).data.role == 'admin';
+
+      // Users can read their own document metadata (optional)
+      allow get: if request.auth != null && resource.data.userId == request.auth.uid;
+
+      // Only admins can delete
+      allow delete: if request.auth != null &&
+        get(/databases/$(database)/documents/artifacts/$(database)/users/$(request.auth.uid)/profile/data).data.role == 'admin';
+    }
+
+    // Existing app artifacts (keep current access model)
+    match /artifacts/{appId}/{document=**} {
+      allow read, write: if request.auth != null; // tighten per your needs
+    }
+  }
+}
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Allow authenticated users to upload to uploads/ only
+    match /uploads/{allPaths=**} {
+      allow read: if request.auth != null; // admins may restrict further
+      allow write: if request.auth != null;
+    }
+
+    // Allow authenticated users to upload loan applications
+    match /applications/{userId}/{documentType} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Deny other paths by default
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}
