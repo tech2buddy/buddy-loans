@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { storage, db, firebaseReady } from '../firebase'
+import { storage, db, firebaseReady, auth } from '../firebase'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore'
 import { Upload, Loader2 } from 'lucide-react'
@@ -22,8 +22,9 @@ export default function DocumentsUpload({ userEmail, userId, onSuccess }) {
 
     try {
       setIsUploading(true)
-      const path = `uploads/${Date.now()}-${file.name}`
-      const fileRef = ref(storage, path)
+      // This matches the /user_docs/{userId}/ logic in the rules above
+      const storageRef = ref(storage, `user_docs/${auth.currentUser.uid}/${file.name}` );
+      const fileRef = storageRef
       await uploadBytes(fileRef, file)
       const downloadURL = await getDownloadURL(fileRef)
       const docRef = await addDoc(collection(db, 'documents'), {
