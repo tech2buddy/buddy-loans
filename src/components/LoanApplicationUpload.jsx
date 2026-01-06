@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { storage, db } from '../firebase';
+import { storage, db, auth } from '../firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { Upload, Loader2, FileText, X } from 'lucide-react';
@@ -46,7 +46,7 @@ export default function LoanApplicationUpload({ userEmail, userId, userName, amo
     try {
       const uploadedFiles = await Promise.all(
         Object.entries(files).map(async ([key, file]) => {
-          const path = `applications/${userId}/${key}-${file.name}`;
+          const path = `applications/${auth.currentUser.uid}/${key}-${file.name}`;
           const fileRef = ref(storage, path);
           await uploadBytes(fileRef, file);
           const downloadURL = await getDownloadURL(fileRef);
