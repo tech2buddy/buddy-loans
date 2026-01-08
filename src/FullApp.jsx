@@ -74,7 +74,7 @@ import {
 
 // --- App Configuration ---
 const appId = import.meta.env.VITE_APP_ID || 'buddy-loans-apple-style'
-const ADMIN_SECRET_PASS = 'TECH2BUDDY_ADMIN'
+const ADMIN_SECRET_PASS = import.meta.env.VITE_ADMIN_SECRET_PASS || 'TECH2BUDDY_ADMIN'
 
 // --- Animation Wrapper ---
 const FadeIn = ({ children, delay = '0ms' }) => (
@@ -84,16 +84,17 @@ const FadeIn = ({ children, delay = '0ms' }) => (
 )
 
 // --- Navigation ---
-const Navbar = ({ setView, currentView, isAdminVerified, onProtectedAction, onAdminTrigger, onLogout, user }) => {
+const Navbar = ({ setView, currentView, isAdminVerified, onProtectedAction, onAdminTrigger, onLogout, user, userData }) => {
   return (
-    <nav className="fixed bottom-8 left-0 right-0 z-[100] px-6 pointer-events-none">
+    <nav className="fixed bottom-8 left-0 right-0 z-[100] px-6 pointer-events-none group">
       <div className="max-w-md mx-auto flex justify-between items-center bg-[#E31C3C]/90 backdrop-blur-2xl border border-white/20 p-2 rounded-full shadow-[0_20px_50px_rgba(0,0,0,0.3)] pointer-events-auto" onDoubleClick={onAdminTrigger}>
         <button onClick={() => setView('home')} className={`flex-1 flex justify-center py-3.5 rounded-full transition-all duration-300 ${currentView === 'home' ? 'bg-white text-[#E31C3C] shadow-lg scale-105' : 'text-white/60'}`}><Zap size={20} /></button>
         <button onClick={() => onProtectedAction('dashboard')} className={`flex-1 flex justify-center py-3.5 rounded-full transition-all duration-300 ${currentView === 'dashboard' ? 'bg-white text-[#E31C3C] shadow-lg scale-105' : 'text-white/60'}`}><CreditCard size={20} /></button>
-        {isAdminVerified && <button onClick={() => setView('admin')} className={`flex-1 flex justify-center py-3.5 rounded-full transition-all duration-300 ${currentView === 'admin' ? 'bg-white text-[#E31C3C] shadow-lg scale-105' : 'text-white/60'}`}><Shield size={20} /></button>}
+        {userData?.role === 'admin' && <button onClick={() => setView('admin')} className={`flex-1 flex justify-center py-3.5 rounded-full transition-all duration-300 ${currentView === 'admin' ? 'bg-white text-[#E31C3C] shadow-lg scale-105' : 'text-white/60'}`}><Shield size={20} /></button>}
         <button onClick={() => onProtectedAction('apply')} className={`flex-1 flex justify-center py-3.5 rounded-full transition-all bg-[#F26D23] text-white shadow-xl shadow-[#F26D23]/30 ml-1 active:scale-90`}><Plus size={22} strokeWidth={3} /></button>
         {user && !user.isAnonymous && <button onClick={onLogout} className={`flex-1 flex justify-center py-3.5 rounded-full transition-all text-white/60`}><LogOut size={20} /></button>}
       </div>
+      <div className="text-center text-xs text-black/50 pt-2 opacity-0 group-hover:opacity-100 transition-opacity">Double-click for admin access</div>
     </nav>
   )
 }
@@ -104,7 +105,7 @@ const AppleHero = ({ onApply, onAdminTrigger }) => (
     <div className="absolute inset-0 -z-10 overflow-hidden"><div className="absolute top-[-5%] left-[-10%] w-[110%] h-[60%] bg-[#F7B3AD]/10 rounded-full blur-[120px] animate-blob"></div><div className="absolute bottom-[-5%] right-[-10%] w-[110%] h-[60%] bg-[#F26D23]/5 rounded-full blur-[120px] animate-blob animation-delay-2000"></div></div>
     <FadeIn delay="100ms"><div onDoubleClick={onAdminTrigger} className="inline-flex items-center gap-2 bg-[#E31C3C]/5 border border-[#E31C3C]/10 px-5 py-2 rounded-full mb-8 shadow-sm cursor-default select-none transition-transform active:scale-95"><span className="text-[10px] font-black text-[#E31C3C] uppercase tracking-[0.3em]">Powered by TECH2BUDDY</span></div></FadeIn>
     <FadeIn delay="250ms"><h1 className="text-5xl md:text-7xl font-black text-slate-900 leading-[1] tracking-tighter mb-8 text-balance">Buddy Loans. <br /><span className="text-transparent bg-clip-text bg-gradient-to-r from-[#E31C3C] to-[#F26D23]">Your campus Buddy.</span></h1></FadeIn>
-    <FadeIn delay="400ms"><p className="text-lg text-slate-500 font-medium max-w-[280px] mx-auto leading-relaxed mb-12">Get up to an <span className="text-slate-900 font-black">R500 loan</span> with a fixed <span className="text-slate-900 font-black border-b-2 border-[#F26D23]">35% interest</span>. Fast Cash when you need it most.</p></FadeIn>
+    <FadeIn delay="400ms"><p className="text-lg text-slate-500 font-medium max-w-[280px] mx-auto leading-relaxed mb-12">Get up to an <span className="text-slate-900 font-black">R500 loan</span> with a fixed <span className="text-slate-900 font-black border-b-2 border-[#F26D23]">40% interest</span>. Fast Cash when you need it most.</p></FadeIn>
     <FadeIn delay="550ms"><button onClick={onApply} className="bg-black text-white px-12 py-5 rounded-[2rem] font-black text-base flex items-center gap-3 active:scale-95 shadow-2xl transition-all hover:scale-105">Secure R500 Now <ArrowRight size={20} /></button></FadeIn>
     <div className="mt-20 w-full max-w-[360px] mx-auto perspective-1000">
       <FadeIn delay="700ms">
@@ -404,7 +405,7 @@ const AdminPanel = ({ loans, users, applications, onUpdateStatus, onAddManualLoa
         <div className="grid grid-cols-2 gap-6 mb-12"><div className="bg-white p-10 rounded-[3.5rem] shadow-sm border border-slate-100 flex flex-col justify-between h-44"><p className="text-slate-400 text-[11px] font-black uppercase tracking-[0.2em] mb-8">Out Flow</p><h4 className="text-4xl font-black text-slate-900 tracking-tighter leading-none">R{totalLent}</h4></div><div className="bg-[#E31C3C] p-10 rounded-[3.5rem] text-white shadow-2xl h-44 flex flex-col justify-between"><p className="text-white/60 text-[11px] font-black uppercase tracking-[0.2em] mb-8">Yield</p><h4 className="text-4xl font-black tracking-tighter leading-none">R{totalProfit.toFixed(2)}</h4></div></div>
         
         <div className="mb-12">
-          <AdminApplications appId={appId} applications={applications} onApplicationClick={handleApplicationClick} />
+        <AdminApplications appId={appId} applications={applications} />
         </div>
         
         <div className="mb-12">
@@ -421,23 +422,23 @@ const AdminPanel = ({ loans, users, applications, onUpdateStatus, onAddManualLoa
 }
 
 // --- Main App Controller ---
+// --- Main App Controller ---
 export default function FullApp() {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [view, setView] = useState('home')
   const [userData, setUserData] = useState(null)
+  const [applicationSubmitted, setApplicationSubmitted] = useState(false); 
   const [allLoans, setAllLoans] = useState([])
   const [allUsers, setAllUsers] = useState([])
   const [userLoans, setUserLoans] = useState([])
   const [showAdminAuth, setShowAdminAuth] = useState(false)
-  const [isAdminVerified, setIsAdminVerified] = useState(false)
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [loginModalMode, setLoginModalMode] = useState('register');
   const [requestedAmount, setRequestedAmount] = useState(500);
 
   const handleLogout = async () => {
     await signOut(auth);
-    setIsAdminVerified(false); // CRITICAL: Reset admin state on logout
     setView('home');
   };
 
@@ -449,7 +450,7 @@ export default function FullApp() {
       await updateDoc(profileRef, { 
         verificationStatus: 'pending', 
         amountRequested: requestedAmount, 
-        applicationSubmitted: true 
+        applicationSubmitted: false 
       });
     } catch (error) {
       console.error('Error updating user profile after application:', error);
@@ -724,11 +725,12 @@ export default function FullApp() {
       <Navbar 
         setView={setView} 
         currentView={view} 
-        isAdminVerified={isAdminVerified} 
+        isAdminVerified={userData?.role === 'admin'} 
         onProtectedAction={handleProtectedAction}
         onAdminTrigger={() => setShowAdminAuth(true)}
         onLogout={handleLogout}
         user={user}
+        userData={userData}
       />
       <main>
         {view === 'home' && (
@@ -757,7 +759,7 @@ export default function FullApp() {
           /> :
           <div className="h-screen flex flex-col items-center justify-center p-8 text-center"><Lock className="text-[#E31C3C] mb-4" size={48} /><h2 className="text-3xl font-black mb-2 tracking-tight">Hub Locked</h2><p className="text-slate-500 mb-8 max-w-xs">Identification required for Hub access.</p><button onClick={() => openLoginModal('login')} className="bg-[#E31C3C] text-white px-10 py-5 rounded-3xl font-black shadow-xl active:scale-95 transition-all">Identify Myself</button></div>
         )}
-        {view === 'admin' && isAdminVerified ? <AdminPanel loans={allLoans} users={allUsers} applications={allApplications} onUpdateStatus={updateStatus} onAddManualLoan={addManualLoan} onDeleteLoan={deleteLoan} onEditLoan={editLoan} /> : null}
+        {view === 'admin' && userData?.role === 'admin' ? <AdminPanel loans={allLoans} users={allUsers} applications={allApplications} onUpdateStatus={updateStatus} onAddManualLoan={addManualLoan} onDeleteLoan={deleteLoan} onEditLoan={editLoan} /> : null}
       </main>
       {showLoginModal && <LoginModal onClose={() => setShowLoginModal(false)} onLogin={handleLoginSuccess} initialMode={loginModalMode} />}
       {showAdminAuth && <AdminAuthModal onClose={() => setShowAdminAuth(false)} onVerify={handleAdminVerify} />}

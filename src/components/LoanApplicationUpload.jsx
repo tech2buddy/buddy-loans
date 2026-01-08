@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { storage, db, auth } from '../firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { Upload, Loader2, FileText, X } from 'lucide-react';
+import { Upload, Loader2, FileText, X, AlertCircle } from 'lucide-react';
 
 const DOCUMENT_TYPES = [
   { key: 'proofOfRegistration', label: 'Proof of Registration', required: true },
@@ -19,6 +19,11 @@ export default function LoanApplicationUpload({ userEmail, userId, userName, amo
   const handleFileSelect = (key, e) => {
     const file = e.target.files?.[0] || null;
     if (file) {
+      // Basic check: limit file size to 5MB
+      if (file.size > 5 * 1024 * 1024) {
+        setError(`${file.name} is too large. Max size is 5MB.`);
+        return;
+      }
       setFiles((prev) => ({ ...prev, [key]: file }));
       setError('');
     }
@@ -36,6 +41,17 @@ export default function LoanApplicationUpload({ userEmail, userId, userName, amo
     e.preventDefault();
     setError('');
 
+    // 1. Validations
+    if (!auth.currentUser) {
+      setError("You must be logged in to submit an application.");
+      return;
+    }
+
+    if (!appId) {
+      setError("System Error: Application ID (appId) is missing. Check your component props.");
+      return;
+    }
+
     const missingFiles = DOCUMENT_TYPES.filter((doc) => doc.required && !files[doc.key]);
     if (missingFiles.length > 0) {
       setError(`Missing required documents: ${missingFiles.map((d) => d.label).join(', ')}`);
@@ -43,13 +59,22 @@ export default function LoanApplicationUpload({ userEmail, userId, userName, amo
     }
 
     setIsUploading(true);
+    
     try {
+      console.log("Starting batch upload to Storage...");
+      
+      // 2. Upload all files to Firebase Storage
       const uploadedFiles = await Promise.all(
         Object.entries(files).map(async ([key, file]) => {
-          const path = `applications/${auth.currentUser.uid}/${key}-${file.name}`;
+          // Path includes timestamp to prevent overwriting files with same name
+          const fileName = `${Date.now()}-${file.name}`;
+          const path = `applications/${auth.currentUser.uid}/${fileName}`;
           const fileRef = ref(storage, path);
+          
+          console.log(`Uploading: ${key}...`);
           await uploadBytes(fileRef, file);
           const downloadURL = await getDownloadURL(fileRef);
+          
           const docType = DOCUMENT_TYPES.find(d => d.key === key);
           return {
             type: key,
@@ -60,34 +85,42 @@ export default function LoanApplicationUpload({ userEmail, userId, userName, amo
         })
       );
 
+      console.log("All files uploaded. Saving to Firestore...");
+
+      // 3. Save application data to Firestore
       const applicationData = {
-        userId,
-        name: userName,
-        email: userEmail,
-        amountRequested,
+        userId: userId || auth.currentUser.uid,
+        name: userName || 'Unknown User',
+        email: userEmail || auth.currentUser.email,
+        amountRequested: amountRequested || 0,
         status: 'pending',
         files: uploadedFiles,
         createdAt: serverTimestamp(),
       };
 
       const appRef = collection(db, 'artifacts', appId, 'public', 'data', 'loan_applications');
-      await addDoc(appRef, applicationData);
+      const docRef = await addDoc(appRef, applicationData);
+
+      console.log("Application saved with ID:", docRef.id);
 
       if (typeof onSuccess === 'function') {
         onSuccess();
       }
     } catch (err) {
-      console.error('Upload failed:', err);
-      setError('An error occurred during upload. Please try again.');
+      console.error('Detailed Upload Error:', err);
+      // This will show the specific Firebase error (like Permission Denied) to the user
+      setError(`Upload failed: ${err.message}`);
     } finally {
       setIsUploading(false);
     }
   };
 
-  // If the application has been submitted, show the success message.
   if (userData?.applicationSubmitted) {
     return (
       <div className="bg-green-50 border border-green-200 rounded-2xl p-8 text-center">
+        <div className="bg-green-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4">
+            <FileText className="text-green-600" />
+        </div>
         <p className="text-green-800 font-black text-lg mb-2">Application Submitted</p>
         <p className="text-green-700 text-sm">Your application is pending review. We will contact you shortly.</p>
       </div>
@@ -96,19 +129,27 @@ export default function LoanApplicationUpload({ userEmail, userId, userName, amo
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl flex gap-3 items-start mb-6">
+        <AlertCircle className="text-blue-500 shrink-0" size={18} />
+        <p className="text-xs text-blue-700 leading-relaxed">
+            Please ensure all documents are clear and legible (PDF, PNG, or JPG). Max size 5MB per file.
+        </p>
+      </div>
+
       {DOCUMENT_TYPES.map((docType) => (
         <div key={docType.key}>
           <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest block mb-2">
             {docType.label}
             {docType.required && <span className="text-red-500 ml-1">*</span>}
           </label>
+          
           {files[docType.key] ? (
             <div className="flex items-center justify-between bg-slate-100 rounded-xl p-3 border border-slate-200">
               <div className="flex items-center gap-3 min-w-0">
                 <FileText className="text-slate-500 shrink-0" size={20} />
                 <span className="text-sm font-medium text-slate-800 truncate">{files[docType.key].name}</span>
               </div>
-              <button type="button" onClick={() => removeFile(docType.key)} className="p-1 text-slate-400 hover:text-red-500">
+              <button type="button" onClick={() => removeFile(docType.key)} className="p-1 text-slate-400 hover:text-red-500 transition-colors">
                 <X size={16} />
               </button>
             </div>
@@ -120,26 +161,31 @@ export default function LoanApplicationUpload({ userEmail, userId, userName, amo
                 className="hidden"
                 accept=".pdf,.jpg,.jpeg,.png"
               />
-              <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center hover:bg-slate-50 hover:border-slate-400 transition-colors">
-                <Upload className="mx-auto text-slate-400" size={24} />
-                <span className="text-sm font-medium text-slate-600 mt-2 block">Click to upload</span>
+              <div className="border-2 border-dashed border-slate-200 rounded-xl p-6 text-center hover:bg-slate-50 hover:border-blue-400 hover:text-blue-600 transition-all group">
+                <Upload className="mx-auto text-slate-400 group-hover:text-blue-500" size={24} />
+                <span className="text-sm font-medium text-slate-500 mt-2 block">Upload {docType.label}</span>
               </div>
             </label>
           )}
         </div>
       ))}
 
-      {error && <p className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">{error}</p>}
+      {error && (
+        <div className="text-sm text-red-600 bg-red-50 p-4 rounded-xl border border-red-100 flex gap-2">
+            <AlertCircle size={18} className="shrink-0" />
+            {error}
+        </div>
+      )}
 
       <button
         disabled={isUploading || Object.keys(files).length < DOCUMENT_TYPES.filter(d => d.required).length}
         type="submit"
-        className="w-full rounded-2xl p-5 flex items-center justify-center gap-3 font-black text-sm uppercase tracking-widest transition-all bg-black text-white disabled:bg-slate-300 disabled:cursor-not-allowed shadow-lg hover:bg-slate-800 active:scale-95"
+        className="w-full rounded-2xl p-5 flex items-center justify-center gap-3 font-black text-sm uppercase tracking-widest transition-all bg-black text-white disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed shadow-lg hover:bg-slate-800 active:scale-[0.98]"
       >
         {isUploading ? (
-          <><Loader2 className="w-5 h-5 animate-spin" />Submitting...</>
+          <><Loader2 className="w-5 h-5 animate-spin" />Processing Application...</>
         ) : (
-          <><Upload size={18} />Submit Application</>
+          <><Upload size={18} />Submit Full Application</>
         )}
       </button>
     </form>
